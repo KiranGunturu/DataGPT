@@ -51,6 +51,8 @@ Grounding the model in the live schema is what keeps the generated SQL aligned t
 
 ### Architecture
 
+![alt text](image-5.png)
+
 ```mermaid
 flowchart LR
     subgraph CLIENT["Client"]
