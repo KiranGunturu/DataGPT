@@ -1,56 +1,136 @@
 # DataGPT
 
-DataGPT is a lightweight AI-powered SQL assistant for Microsoft SQL Server. It uses the schema of the `orders` table and an OpenAI model to convert natural-language questions into SQL, then executes the query against the database and displays the result in the UI or terminal.
+**Natural-language querying for Microsoft SQL Server, powered by an LLM.**
 
-The project has two entry points:
+DataGPT lets a business user ask a question in plain English — *"What are the total orders by month?"* — and get back a live result set from the database, with no SQL written by hand. It reads the schema of the `orders` table, asks an OpenAI model to translate the question into SQL, runs that SQL against SQL Server, and returns the rows to the screen.
 
-- A CLI script in [main.py](main.py) for direct terminal-based use.
-- A Streamlit app in [streamlit_app.py](streamlit_app.py) for interactive querying in a browser.
+> **Status:** Working prototype. Proven end-to-end on a single table. Not yet hardened for production — see [Current State Assessment](#current-state-assessment).
 
 ---
 
-## Overview
+## Executive summary
 
-The application follows a simple pattern:
+| | |
+|---|---|
+| **What it is** | A lightweight AI SQL assistant that turns plain-English questions into executed queries against SQL Server. |
+| **Who it's for** | Analysts and business users who need answers from data but don't write SQL. |
+| **Why it matters** | Removes the analyst-as-bottleneck for routine data questions and shortens time-to-answer from hours to seconds. |
+| **How it's used** | Two entry points — a browser app (Streamlit) for interactive use, and a CLI for quick testing. |
+| **Where it stands** | Functional prototype scoped to one table, with hardcoded connection details and no query-safety layer. |
+| **What's next** | Broaden beyond one table, add a SQL validation/safety layer, and externalize configuration. See [Roadmap](#recommendations--roadmap). |
 
-1. Load the database schema from SQL Server.
-2. Send the schema + user question to the OpenAI API.
-3. Ask the model to return only SQL.
-4. Run the generated query against SQL Server.
-5. Display the returned rows in the app or terminal.
+**The bottom line:** DataGPT demonstrates a credible, low-cost path to self-service analytics. The core loop works today. The gap to production is well understood and addressable — it's engineering hardening, not a research question.
 
-This is useful for business users who want to ask questions like:
+---
+
+## The business case
+
+Most routine data questions don't need a data engineer — they need a fast, reliable translation from *question* to *query*. Today that translation is a manual step that consumes analyst time and creates a queue. DataGPT collapses that step.
+
+Typical questions it's built to answer:
 
 - What are the total sales by month?
 - Which customers placed the most orders?
 - Show the top 10 products by revenue.
 
+The value is not novelty — it's **throughput and access**. Business users get answers directly; skilled analysts are freed from repetitive query-writing to focus on higher-value work.
+
 ---
 
-## Architecture
+## How it works
+
+At a conceptual level, every request follows the same five-step loop:
+
+1. **Load** the database schema from SQL Server.
+2. **Compose** a prompt combining the schema and the user's question.
+3. **Generate** SQL by sending that prompt to the OpenAI API (instructed to return SQL only).
+4. **Execute** the generated query against SQL Server.
+5. **Display** the returned rows in the app or terminal.
+
+Grounding the model in the live schema is what keeps the generated SQL aligned to the real table structure rather than a guess.
+
+### Architecture
 
 ```mermaid
 flowchart LR
-    User[User / Analyst] --> UI[Streamlit UI or CLI]
-    UI --> Prompt[Build SQL prompt with schema + question]
-    Prompt --> OpenAI[OpenAI Responses API]
-    OpenAI --> SQL[Generated SQL query]
-    SQL --> DB[SQL Server Database]
-    DB --> Result[Query result as DataFrame]
-    Result --> UI
-    UI --> Display[Table / result output]
+    subgraph CLIENT["Client"]
+        direction TB
+        User([User / Analyst])
+        UI["App<br/>Streamlit · CLI"]
+    end
+
+    subgraph GENERATION["SQL Generation"]
+        direction TB
+        Prompt["Build prompt<br/>schema + question"]
+        OpenAI["OpenAI<br/>Responses API"]
+        SQL["Generated SQL"]
+    end
+
+    subgraph DATA["Data"]
+        direction TB
+        DB[("SQL Server<br/>retail.dbo.orders")]
+        Result["Result<br/>DataFrame"]
+    end
+
+    User -->|"1 · ask"| UI
+    UI -->|"2 · build"| Prompt
+    Prompt -->|"3 · send"| OpenAI
+    OpenAI -->|"4 · generate"| SQL
+    SQL -->|"5 · execute"| DB
+    DB -->|"6 · return rows"| Result
+    Result -.->|"7 · display"| UI
+
+    classDef client fill:#ffffff,stroke:#1f3864,stroke-width:1.5px,color:#1f3864;
+    classDef gen fill:#fdf0e6,stroke:#ed7d31,stroke-width:1.5px,color:#843c0c;
+    classDef data fill:#eef2fa,stroke:#1f3864,stroke-width:1.5px,color:#1f3864;
+
+    class User,UI client;
+    class Prompt,OpenAI,SQL gen;
+    class DB,Result data;
+
+    style CLIENT fill:#ffffff,stroke:#c9c9c9,stroke-width:1px,color:#1f3864;
+    style GENERATION fill:#ffffff,stroke:#c9c9c9,stroke-width:1px,color:#843c0c;
+    style DATA fill:#ffffff,stroke:#c9c9c9,stroke-width:1px,color:#1f3864;
 ```
-
-### Key flow details
-
-- [mydb.py](mydb.py) handles the database connection and schema discovery.
-- [streamlit_app.py](streamlit_app.py) is the user-facing experience for browser-based interaction.
-- [main.py](main.py) is a simpler command-line version of the same logic.
-- [requirements.txt](requirements.txt) includes the Python packages required by the project.
 
 ---
 
-## Project structure
+## Solution components
+
+DataGPT is deliberately small — four working files, each with one job.
+
+### `mydb.py` — the data layer
+
+Owns the connection to SQL Server and everything schema-related.
+
+- Creates a SQLAlchemy engine and connects via `pyodbc`.
+- Runs queries with `pd.read_sql`.
+- Fetches column metadata from `INFORMATION_SCHEMA.COLUMNS` for a given table.
+
+**Current assumptions (hardcoded):**
+
+- Database: `retail`
+- Instance: `localhost\MSSQLSERVER03`
+- Schema target: `dbo.orders`
+
+### `streamlit_app.py` — the interactive web app
+
+The primary user-facing experience.
+
+- Sets up the page layout and takes a question from the UI.
+- Fetches the schema once, cached, to avoid repeated lookups.
+- Builds the schema-plus-question prompt and calls the OpenAI API.
+- Shows the generated SQL, runs it, and displays the result table.
+
+### `main.py` — the CLI
+
+A stripped-down version of the same loop for terminal use. Loads environment variables, fetches the `orders` schema, requests SQL, executes it, and prints the result. This is the fastest way to validate the core idea without launching the web app.
+
+### `requirements.txt` — dependencies
+
+The Python packages the project needs (listed under [Tech stack](#tech-stack)).
+
+### Project structure
 
 ```text
 DataGPT/
@@ -67,70 +147,15 @@ DataGPT/
 
 ---
 
-## Files and responsibilities
-
-### [main.py](main.py)
-
-This script uses the OpenAI API directly from the terminal:
-
-- loads environment variables
-- fetches the `orders` schema
-- asks the model for SQL only
-- executes the generated SQL
-- prints the result
-
-This is the fastest way to test the core idea without running the Streamlit app.
-
-### [mydb.py](mydb.py)
-
-This file contains the database layer.
-
-Responsibilities:
-
-- create a SQLAlchemy engine for SQL Server
-- connect using `pyodbc`
-- run queries with `pd.read_sql`
-- fetch the `INFORMATION_SCHEMA.COLUMNS` metadata for a table
-
-Important logic:
-
-- It currently targets the database named `retail`.
-- It assumes a local SQL Server instance at `localhost\MSSQLSERVER03`.
-- The schema is retrieved specifically for the `dbo.orders` table.
-
-### [streamlit_app.py](streamlit_app.py)
-
-This is the interactive web app.
-
-Responsibilities:
-
-- set up the page layout
-- ask the user a question in the UI
-- query the database schema once using cache
-- build a prompt including schema and question
-- call the OpenAI API
-- show the generated SQL
-- run the SQL against the database
-- display the result table
-
----
-
 ## Tech stack
 
-- Python
-- Streamlit
-- SQLAlchemy
-- pyodbc
-- pandas
-- OpenAI Python SDK
-- python-dotenv
-- Microsoft SQL Server
+Python · Streamlit · SQLAlchemy · pyodbc · pandas · OpenAI Python SDK · python-dotenv · Microsoft SQL Server
 
 ---
 
-## Prerequisites
+## Getting started
 
-Before running the app, make sure you have:
+### Prerequisites
 
 1. Python installed.
 2. Microsoft ODBC Driver 18 for SQL Server installed on the machine.
@@ -138,123 +163,219 @@ Before running the app, make sure you have:
 4. A valid OpenAI API key.
 5. A database named `retail` with a table named `orders` in the `dbo` schema.
 
----
+### Environment
 
-## Environment setup
-
-Create a `.env` file in the project root with the following variable:
+Create a `.env` file in the project root:
 
 ```env
 OPENAI_API_KEY=your_openai_api_key_here
 ```
 
-You may also need to confirm that your SQL Server details in [mydb.py](mydb.py) match your local environment.
+Confirm the SQL Server details in `mydb.py` match your local environment.
 
----
-
-## Installation
-
-From the project root, install the dependencies:
+### Install
 
 ```bash
 pip install -r requirements.txt
 ```
 
-If you are using the project virtual environment already present in `myenv`, activate it first:
+If you're using the bundled virtual environment in `myenv`:
 
 ```bash
+# Command Prompt
 myenv\Scripts\activate
-```
 
-On PowerShell:
-
-```powershell
+# PowerShell
 .\myenv\Scripts\Activate.ps1
 ```
 
----
-
-## Running the app
-
-### CLI version
+### Run
 
 ```bash
+# CLI — prompts for a question, generates and runs SQL, prints results
 py main.py
-```
 
-This will prompt you for a question, generate SQL, run it, and print the results.
-
-### Streamlit app
-
-```bash
+# Web app — open the local URL shown in the terminal
 streamlit run streamlit_app.py
 ```
 
-Then open the local URL shown in the terminal in your browser.
+On launch, Streamlit confirms the app is serving locally:
+
+```text
+You can now view your Streamlit app in your browser.
+
+  Local URL:   http://localhost:8501
+  Network URL: http://<your-lan-ip>:8501
+```
+
+![DataGPT launched via `streamlit run` in the terminal](images/app-running-terminal.png)
+
+*Streamlit dev server started on port 8501 during a local run.*
 
 ---
 
-## Example usage
+## Examples in action
 
-Example question in the app:
+Real queries run against the `orders` table through the Streamlit app. Each shows the plain-English question, the SQL the model generated, and a sample of the returned rows.
 
-> What are the total orders by month?
+### 1. Total orders by month
 
-The app will:
+> **Ask:** *what are the total orders by month?*
 
-1. load the `orders` schema,
-2. ask the model for the corresponding SQL,
-3. execute the query,
-4. show a data table with the result.
+```sql
+SELECT
+    DATEFROMPARTS(YEAR(order_date), MONTH(order_date), 1) AS order_month,
+    COUNT(DISTINCT order_id) AS total_orders
+FROM orders
+GROUP BY
+    DATEFROMPARTS(YEAR(order_date), MONTH(order_date), 1)
+ORDER BY
+    order_month;
+```
+
+| order_month | total_orders |
+|---|--:|
+| 2018-01-01 | 32 |
+| 2018-02-01 | 28 |
+| 2018-03-01 | 71 |
+| 2018-04-01 | 66 |
+
+![DataGPT answering "total orders by month" with generated SQL and results](images/example-orders-by-month.png)
+
+*Monthly order counts returned live from SQL Server.*
+
+### 2. Top 5 products by sales
+
+> **Ask:** *give me top 5 products by sales*
+
+```sql
+SELECT TOP (5)
+    product_id,
+    product_name,
+    SUM(sales) AS total_sales
+FROM orders
+GROUP BY product_id, product_name
+ORDER BY total_sales DESC;
+```
+
+| product_id | product_name | total_sales |
+|---|---|--:|
+| TEC-CO-10004722 | Canon imageCLASS 2200 Advanced Copier | 61599.8223 |
+| OFF-BI-10003527 | Fellowes PB500 Electric Punch Plastic Comb Binding Machine with Manual Bind | 27453.384 |
+| TEC-MA-10002412 | Cisco TelePresence System EX90 Videoconferencing Unit | 22638.4805 |
+| FUR-CH-10002024 | HON 5400 Series Task Chairs for Big and Tall | 21870.5755 |
+
+![DataGPT answering "top 5 products by sales" with generated SQL and results](images/example-top-products.png)
+
+*Top products ranked by summed sales.*
+
+### 3. Total sales by state
+
+> **Ask:** *give me total sales by state*
+
+```sql
+SELECT
+    state,
+    SUM(sales) AS total_sales
+FROM orders
+GROUP BY state
+ORDER BY total_sales DESC;
+```
+
+| state | total_sales |
+|---|--:|
+| California | 457687.6302 |
+| New York | 310876.2706 |
+| Texas | 170188.0457 |
+| Washington | 138641.2698 |
+| Pennsylvania | 116511.9129 |
+
+![DataGPT answering "total sales by state" with generated SQL and results](images/example-sales-by-state.png)
+
+*Sales aggregated by state, California leading.*
+
+### 4. Total sales by year and month
+
+> **Ask:** *give me total sales by year and month* — returns all 48 months (2018–2021).
+
+```sql
+SELECT
+    YEAR(order_date) AS sales_year,
+    MONTH(order_date) AS sales_month,
+    SUM(sales) AS total_sales
+FROM orders
+GROUP BY
+    YEAR(order_date),
+    MONTH(order_date)
+ORDER BY
+    sales_year,
+    sales_month;
+```
+
+Sample rows across the 2020–2021 boundary:
+
+| sales_year | sales_month | total_sales |
+|--:|--:|--:|
+| 2020 | 11 | 79411.9655 |
+| 2020 | 12 | 96999.0429 |
+| 2021 | 1 | 43971.3735 |
+| 2021 | 2 | 20301.1333 |
+| 2021 | 3 | 58872.3525 |
+
+![DataGPT answering "total sales by year and month" showing 48 rows returned](images/example-sales-by-year-month.png)
+
+*48 monthly rows spanning 2018–2021.*
 
 ---
 
-## Current implementation notes
+## Current state assessment
 
-This project is a prototype and has a few important considerations:
+An honest read of where the prototype stands today. None of these are blockers to *demonstrating* value — they're the difference between a demo and a deployable tool.
 
-- The schema is fixed to the `orders` table.
-- The connection details are hardcoded in [mydb.py](mydb.py).
-- The prompt instructs the model to return SQL only, but model output can still vary.
-- The app assumes the database structure is valid and consistent with the questions being asked.
-- There is no dedicated validation layer to check if a generated SQL query is safe before execution.
-
----
-
-## Suggested improvements
-
-To make the project more production-ready, consider:
-
-- supporting multiple tables instead of only `orders`
-- adding schema introspection for all tables dynamically
-- validating generated SQL before execution
-- adding user authentication and permissions
-- logging queries and errors
-- adding query limits and safety checks
-- creating a proper settings/config file instead of hardcoded values
-- adding tests around schema loading and query execution
+| Area | Current state | Implication |
+|---|---|---|
+| **Scope** | Fixed to the single `orders` table. | Can't answer cross-table or multi-entity questions. |
+| **Configuration** | Connection details hardcoded in `mydb.py`. | Every environment change requires a code edit. |
+| **Output reliability** | Model is instructed to return SQL only, but output can still vary. | Occasional malformed or unexpected queries. |
+| **Data assumptions** | Assumes the schema is valid and consistent with the questions asked. | Fragile against schema drift or off-topic questions. |
+| **Query safety** | No validation layer before execution. | Generated SQL runs directly — no guard against unsafe operations. |
 
 ---
 
-## Security and usage warning
+## Recommendations & roadmap
 
-This project sends database schema information and user prompts to an external OpenAI API. In production, make sure you:
+Prioritized by effort-to-value. The sequencing matters: safety and configuration should land before broadening scope, so the surface area grows on a stable base.
 
-- keep API keys in a secure environment
-- restrict database access permissions
-- avoid exposing sensitive schema or data in prompts
-- validate generated SQL before running it in production systems
+### Priority 1 — Harden the foundation (near-term)
+
+- **Add a SQL validation/safety layer** before execution — allowlist read-only operations, block writes/DDL, enforce query limits. *This is the single highest-value fix.*
+- **Externalize configuration** into a settings/config file, replacing hardcoded connection details.
+- **Add logging** for queries and errors to support debugging and auditability.
+
+### Priority 2 — Broaden capability (mid-term)
+
+- **Support multiple tables** rather than only `orders`.
+- **Introspect all tables dynamically** so the schema context isn't manually scoped.
+- **Add tests** around schema loading and query execution to lock in reliability as scope grows.
+
+### Priority 3 — Enterprise readiness (strategic)
+
+- **Add authentication and permissions** so access maps to who should see what.
+- **Enforce per-user query limits and safety checks** at the access-control layer.
 
 ---
 
-## Summary
+## Security & governance
 
-DataGPT is a simple but effective example of an AI + SQL workflow:
+DataGPT sends database schema information and user prompts to an external OpenAI API. Before any production use:
 
-- natural language input
-- database schema context
-- LLM-generated SQL
-- live execution against Microsoft SQL Server
-- immediate result display
+- Keep API keys in a secure environment, never in source.
+- Restrict database access to the minimum required permissions (read-only where possible).
+- Avoid exposing sensitive schema or data in prompts.
+- Validate generated SQL before running it against production systems.
 
-It is a solid foundation for building a more robust business intelligence assistant. 
+---
+
+## Summary  
+
+DataGPT is a clean demonstration of an AI-plus-SQL workflow: natural-language input, schema-grounded prompting, LLM-generated SQL, live execution against SQL Server, and immediate results. The core loop is proven. With a safety layer, externalized configuration, and multi-table support, it's a solid foundation for a genuine self-service business intelligence assistant. 
