@@ -208,7 +208,7 @@ You can now view your Streamlit app in your browser.
   Network URL: http://<your-lan-ip>:8501
 ```
 
-<!-- ⬇  DRAG SCREENSHOT HERE  →  app-running-terminal.png   (drop it on this line in the GitHub web editor) -->
+![alt text](image.png)
 
 *Streamlit dev server started on port 8501 during a local run.*
 
@@ -222,25 +222,7 @@ Real queries run against the `orders` table through the Streamlit app. Each show
 
 > **Ask:** *what are the total orders by month?*
 
-```sql
-SELECT
-    DATEFROMPARTS(YEAR(order_date), MONTH(order_date), 1) AS order_month,
-    COUNT(DISTINCT order_id) AS total_orders
-FROM orders
-GROUP BY
-    DATEFROMPARTS(YEAR(order_date), MONTH(order_date), 1)
-ORDER BY
-    order_month;
-```
-
-| order_month | total_orders |
-|---|--:|
-| 2018-01-01 | 32 |
-| 2018-02-01 | 28 |
-| 2018-03-01 | 71 |
-| 2018-04-01 | 66 |
-
-<!-- ⬇  DRAG SCREENSHOT HERE  →  example-orders-by-month.png   (drop it on this line in the GitHub web editor) -->
+![alt text](image-1.png)
 
 *Monthly order counts returned live from SQL Server.*
 
@@ -248,24 +230,7 @@ ORDER BY
 
 > **Ask:** *give me top 5 products by sales*
 
-```sql
-SELECT TOP (5)
-    product_id,
-    product_name,
-    SUM(sales) AS total_sales
-FROM orders
-GROUP BY product_id, product_name
-ORDER BY total_sales DESC;
-```
-
-| product_id | product_name | total_sales |
-|---|---|--:|
-| TEC-CO-10004722 | Canon imageCLASS 2200 Advanced Copier | 61599.8223 |
-| OFF-BI-10003527 | Fellowes PB500 Electric Punch Plastic Comb Binding Machine with Manual Bind | 27453.384 |
-| TEC-MA-10002412 | Cisco TelePresence System EX90 Videoconferencing Unit | 22638.4805 |
-| FUR-CH-10002024 | HON 5400 Series Task Chairs for Big and Tall | 21870.5755 |
-
-<!-- ⬇  DRAG SCREENSHOT HERE  →  example-top-products.png   (drop it on this line in the GitHub web editor) -->
+![alt text](image-2.png)
 
 *Top products ranked by summed sales.*
 
@@ -273,24 +238,7 @@ ORDER BY total_sales DESC;
 
 > **Ask:** *give me total sales by state*
 
-```sql
-SELECT
-    state,
-    SUM(sales) AS total_sales
-FROM orders
-GROUP BY state
-ORDER BY total_sales DESC;
-```
-
-| state | total_sales |
-|---|--:|
-| California | 457687.6302 |
-| New York | 310876.2706 |
-| Texas | 170188.0457 |
-| Washington | 138641.2698 |
-| Pennsylvania | 116511.9129 |
-
-<!-- ⬇  DRAG SCREENSHOT HERE  →  example-sales-by-state.png   (drop it on this line in the GitHub web editor) -->
+![alt text](image-3.png)
 
 *Sales aggregated by state, California leading.*
 
@@ -298,31 +246,7 @@ ORDER BY total_sales DESC;
 
 > **Ask:** *give me total sales by year and month* — returns all 48 months (2018–2021).
 
-```sql
-SELECT
-    YEAR(order_date) AS sales_year,
-    MONTH(order_date) AS sales_month,
-    SUM(sales) AS total_sales
-FROM orders
-GROUP BY
-    YEAR(order_date),
-    MONTH(order_date)
-ORDER BY
-    sales_year,
-    sales_month;
-```
-
-Sample rows across the 2020–2021 boundary:
-
-| sales_year | sales_month | total_sales |
-|--:|--:|--:|
-| 2020 | 11 | 79411.9655 |
-| 2020 | 12 | 96999.0429 |
-| 2021 | 1 | 43971.3735 |
-| 2021 | 2 | 20301.1333 |
-| 2021 | 3 | 58872.3525 |
-
-<!-- ⬇  DRAG SCREENSHOT HERE  →  example-sales-by-year-month.png   (drop it on this line in the GitHub web editor) -->
+![alt text](image-4.png)
 
 *48 monthly rows spanning 2018–2021.*
 
