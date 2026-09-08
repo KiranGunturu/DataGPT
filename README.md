@@ -179,7 +179,7 @@ On PowerShell:
 ### CLI version
 
 ```bash
-python main.py
+py main.py
 ```
 
 This will prompt you for a question, generate SQL, run it, and print the results.
@@ -257,4 +257,4 @@ DataGPT is a simple but effective example of an AI + SQL workflow:
 - live execution against Microsoft SQL Server
 - immediate result display
 
-It is a solid foundation for building a more robust business intelligence assistant.
+It is a solid foundation for building a more robust business intelligence assistant. 
