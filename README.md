@@ -53,50 +53,6 @@ Grounding the model in the live schema is what keeps the generated SQL aligned t
 
 ![alt text](image-5.png)
 
-```mermaid
-flowchart LR
-    subgraph CLIENT["Client"]
-        direction TB
-        User([User / Analyst])
-        UI["App<br/>Streamlit · CLI"]
-    end
-
-    subgraph GENERATION["SQL Generation"]
-        direction TB
-        Prompt["Build prompt<br/>schema + question"]
-        OpenAI["OpenAI<br/>Responses API"]
-        SQL["Generated SQL"]
-    end
-
-    subgraph DATA["Data"]
-        direction TB
-        DB[("SQL Server<br/>retail.dbo.orders")]
-        Result["Result<br/>DataFrame"]
-    end
-
-    User -->|"1 · ask"| UI
-    UI -->|"2 · build"| Prompt
-    Prompt -->|"3 · send"| OpenAI
-    OpenAI -->|"4 · generate"| SQL
-    SQL -->|"5 · execute"| DB
-    DB -->|"6 · return rows"| Result
-    Result -.->|"7 · display"| UI
-
-    classDef client fill:#ffffff,stroke:#1f3864,stroke-width:1.5px,color:#1f3864;
-    classDef gen fill:#fdf0e6,stroke:#ed7d31,stroke-width:1.5px,color:#843c0c;
-    classDef data fill:#eef2fa,stroke:#1f3864,stroke-width:1.5px,color:#1f3864;
-
-    class User,UI client;
-    class Prompt,OpenAI,SQL gen;
-    class DB,Result data;
-
-    style CLIENT fill:#ffffff,stroke:#c9c9c9,stroke-width:1px,color:#1f3864;
-    style GENERATION fill:#ffffff,stroke:#c9c9c9,stroke-width:1px,color:#843c0c;
-    style DATA fill:#ffffff,stroke:#c9c9c9,stroke-width:1px,color:#1f3864;
-```
-
----
-
 ## Solution components
 
 DataGPT is deliberately small — four working files, each with one job.
