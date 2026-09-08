@@ -376,6 +376,6 @@ DataGPT sends database schema information and user prompts to an external OpenAI
 
 ---
 
-## Summary  
+## Summary
 
-DataGPT is a clean demonstration of an AI-plus-SQL workflow: natural-language input, schema-grounded prompting, LLM-generated SQL, live execution against SQL Server, and immediate results. The core loop is proven. With a safety layer, externalized configuration, and multi-table support, it's a solid foundation for a genuine self-service business intelligence assistant. 
+DataGPT is a clean demonstration of an AI-plus-SQL workflow: natural-language input, schema-grounded prompting, LLM-generated SQL, live execution against SQL Server, and immediate results. The core loop is proven. With a safety layer, externalized configuration, and multi-table support, it's a solid foundation for a genuine self-service business intelligence assistant.
