@@ -10,6 +10,20 @@ from mydb import get_schema, run_query
 load_dotenv()
 
 st.set_page_config(page_title="DataGPT", page_icon=":bar_chart:", layout="wide")
+st.markdown(
+    """
+    <style>
+        .block-container {
+            padding-top: 1.5rem;
+        }
+
+        h1 {
+            margin-top: 0;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 st.title("DataGPT")
 st.caption("Ask a question about the orders data and get the result from SQL Server.")
 
@@ -25,7 +39,7 @@ with st.form("query_form"):
         placeholder="For example: What are the total orders by month?",
         height=100,
     )
-    submitted = st.form_submit_button("Run query", type="primary")
+    submitted = st.form_submit_button("Run Query", type="primary")
 
 if submitted:
     if not question.strip():

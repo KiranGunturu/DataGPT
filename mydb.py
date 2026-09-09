@@ -1,6 +1,8 @@
+import re
+from urllib.parse import quote_plus
+
 import pandas as pd
 from sqlalchemy import create_engine, text
-from urllib.parse import quote_plus
 
 def get_engine(database="retail", server="localhost\\MSSQLSERVER03"):
     odbc = quote_plus(
@@ -17,8 +19,25 @@ def get_engine(database="retail", server="localhost\\MSSQLSERVER03"):
 _engine = get_engine()
 
 
+def validate_select_query(query):
+    """Allow exactly one plain SELECT statement."""
+    normalized = query.strip()
+    if not normalized:
+        raise ValueError("The query is empty.")
+
+    if normalized.endswith(";"):
+        normalized = normalized[:-1].rstrip()
+
+    if ";" in normalized or "--" in normalized or "/*" in normalized or "*/" in normalized:
+        raise ValueError("Only one SELECT statement is allowed.")
+
+    if not re.match(r"^SELECT\b", normalized, flags=re.IGNORECASE):
+        raise ValueError("Only SELECT queries are allowed.")
+
+
 def run_query(query, params=None):
     """Run a SQL query and return the result as a DataFrame."""
+    validate_select_query(query)
     with _engine.connect() as conn:
         df = pd.read_sql(text(query), conn, params=params)
     return df

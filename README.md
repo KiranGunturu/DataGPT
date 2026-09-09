@@ -62,8 +62,27 @@ DataGPT is deliberately small — four working files, each with one job.
 Owns the connection to SQL Server and everything schema-related.
 
 - Creates a SQLAlchemy engine and connects via `pyodbc`.
-- Runs queries with `pd.read_sql`.
+- Runs one validated `SELECT` query at a time with `pd.read_sql`.
 - Fetches column metadata from `INFORMATION_SCHEMA.COLUMNS` for a given table.
+
+#### Query safety
+
+All calls to `run_query()` pass through the same validator before reaching SQL
+Server. The validator allows one `SELECT` statement, with an optional trailing
+semicolon. It rejects empty queries, `INSERT`, `UPDATE`, `DELETE`, `DROP`, and
+other non-`SELECT` statements, as well as SQL comments and multiple statements.
+
+This is a usability and defense-in-depth check, not the database security
+boundary. Use a dedicated SQL Server login with read-only permissions as well:
+
+```sql
+CREATE USER datagpt_reader FOR LOGIN datagpt_reader;
+ALTER ROLE db_datareader ADD MEMBER datagpt_reader;
+```
+
+Do not grant this login `db_datawriter`, `db_ddladmin`, `db_owner`, or `EXECUTE`.
+The connection in `mydb.py` should use this login instead of an administrator
+account.
 
 **Current assumptions (hardcoded):**
 
@@ -208,6 +227,32 @@ Real queries run against the `orders` table through the Streamlit app. Each show
 
 *48 monthly rows spanning 2018–2021.*
 
+### 5. DELETE query rejected
+
+> **Ask:** *delete the orders from California*.
+
+The generated `DELETE` statement is rejected by the query validator and is not
+sent to SQL Server. The application displays an error instead of changing any
+data.
+
+<!-- Add a screenshot showing the rejected DELETE query and error message here. -->
+![alt text](images/delete_rejected.png)
+
+*DELETE statements are blocked because only SELECT queries are allowed.*
+
+### 6. UPDATE query rejected
+
+> **Ask:** *update the order status to shipped*.
+
+The generated `UPDATE` statement is rejected before execution. Existing rows
+remain unchanged, and the user receives an error explaining that only SELECT
+queries are allowed.
+
+<!-- Add a screenshot showing the rejected UPDATE query and error message here. -->
+![alt text](images/update_rejected.png)
+
+*UPDATE statements are blocked because only SELECT queries are allowed.*
+
 ---
 
 ## Current state assessment
@@ -220,7 +265,7 @@ An honest read of where the prototype stands today. None of these are blockers t
 | **Configuration** | Connection details hardcoded in `mydb.py`. | Every environment change requires a code edit. |
 | **Output reliability** | Model is instructed to return SQL only, but output can still vary. | Occasional malformed or unexpected queries. |
 | **Data assumptions** | Assumes the schema is valid and consistent with the questions asked. | Fragile against schema drift or off-topic questions. |
-| **Query safety** | No validation layer before execution. | Generated SQL runs directly — no guard against unsafe operations. |
+| **Query safety** | A validator allows one SELECT statement and rejects writes, DDL, comments, and multiple statements. | The application has a read-only query guard; a read-only database login is still required for defense in depth. |
 
 ---
 
@@ -230,7 +275,7 @@ Prioritized by effort-to-value. The sequencing matters: safety and configuration
 
 ### Priority 1 — Harden the foundation (near-term)
 
-- **Add a SQL validation/safety layer** before execution — allowlist read-only operations, block writes/DDL, enforce query limits. *This is the single highest-value fix.*
+- **Strengthen the SQL validation/safety layer** before execution — add query limits and broader SQL parsing as the supported scope grows.
 - **Externalize configuration** into a settings/config file, replacing hardcoded connection details.
 - **Add logging** for queries and errors to support debugging and auditability.
 
