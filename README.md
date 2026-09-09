@@ -51,7 +51,7 @@ Grounding the model in the live schema is what keeps the generated SQL aligned t
 
 ### Architecture
 
-![alt text](image-5.png)
+![alt text](images/image-5.png)
 
 ## Solution components
 
@@ -166,7 +166,7 @@ You can now view your Streamlit app in your browser.
   Network URL: http://<your-lan-ip>:8501
 ```
 
-![alt text](image.png)
+![alt text](images/image.png)
 
 *Streamlit dev server started on port 8501 during a local run.*
 
@@ -180,7 +180,7 @@ Real queries run against the `orders` table through the Streamlit app. Each show
 
 > **Ask:** *what are the total orders by month?*
 
-![alt text](image-1.png)
+![alt text](images/image-1.png)
 
 *Monthly order counts returned live from SQL Server.*
 
@@ -196,7 +196,7 @@ Real queries run against the `orders` table through the Streamlit app. Each show
 
 > **Ask:** *give me total sales by state*
 
-![alt text](image-3.png)
+![alt text](images/image-3.png)
 
 *Sales aggregated by state, California leading.*
 
@@ -204,7 +204,7 @@ Real queries run against the `orders` table through the Streamlit app. Each show
 
 > **Ask:** *give me total sales by year and month* — returns all 48 months (2018–2021).
 
-![alt text](image-4.png)
+![alt text](images/image-4.png)
 
 *48 monthly rows spanning 2018–2021.*
 
