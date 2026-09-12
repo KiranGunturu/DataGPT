@@ -6,3 +6,5 @@ pandas
 sqlalchemy
 google-genai
 pyodbc
+pydantic
+typing
